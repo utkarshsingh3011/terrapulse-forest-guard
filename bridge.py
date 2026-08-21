@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""TerraPulse IoT Gateway Bridge (ESP32 + YAMNet Acoustic Threat Classifier)
+"""TerraPulse IoT Gateway Bridge (ESP32 + Calibrated YAMNet Acoustic Threat
 
-Cross-platform compatible for macOS and Windows.
+Classifier)
 """
 
 import argparse
@@ -37,13 +37,12 @@ try:
   import tensorflow_hub as hub
 except ImportError:
   print(
-      "[ERROR] TensorFlow/TF-Hub not installed. Run: pip install tensorflow"
+      "[ERROR] TensorFlow / TF-Hub not installed. Run: pip install tensorflow"
       " tensorflow-hub"
   )
   sys.exit(1)
 
 IS_WINDOWS = platform.system() == "Windows"
-
 if IS_WINDOWS:
   import msvcrt
 else:
@@ -51,12 +50,12 @@ else:
   import termios
   import tty
 
+# Global Thread-Safe State
 state_lock = threading.Lock()
 
-# Hardware Telemetry State (DHT11 & Smoke Sensor)
 sensor_state = {
-    "temp": 29.0,
-    "hum": 60.0,
+    "temp": 26.5,
+    "hum": 52.0,
     "smoke": 3.0,
     "serial_connected": False,
 }
@@ -83,7 +82,7 @@ def get_default_port():
 
 
 # ----------------------------------------------------------------------
-# THREAD 1: ESP32 Telemetry Reader (with Auto-Simulation Fallback)
+# THREAD 1: SERIAL WORKER (ESP32: DHT11 + MQ-2)
 # ----------------------------------------------------------------------
 def serial_worker(port_name: str, baud_rate: int):
   global running, sensor_state
@@ -93,8 +92,8 @@ def serial_worker(port_name: str, baud_rate: int):
       " baud)..."
   )
 
-  simulated_temp = 29.0
-  simulated_hum = 60.0
+  simulated_temp = 26.5
+  simulated_hum = 52.0
   simulated_smoke = 3.0
 
   while running:
@@ -128,9 +127,10 @@ def serial_worker(port_name: str, baud_rate: int):
     except serial.SerialException:
       with state_lock:
         sensor_state["serial_connected"] = False
-        simulated_temp += np.random.uniform(-0.1, 0.1)
-        simulated_hum += np.random.uniform(-0.2, 0.2)
-        simulated_smoke += np.random.uniform(-0.1, 0.1)
+        # Graceful baseline simulation fallback if board is disconnected
+        simulated_temp += np.random.uniform(-0.08, 0.08)
+        simulated_hum += np.random.uniform(-0.15, 0.15)
+        simulated_smoke += np.random.uniform(-0.05, 0.05)
 
         sensor_state["temp"] = round(simulated_temp, 1)
         sensor_state["hum"] = round(simulated_hum, 1)
@@ -149,11 +149,10 @@ def serial_worker(port_name: str, baud_rate: int):
 # THREAD 2: YAMNet Machine Learning Acoustic Classifier
 # ----------------------------------------------------------------------
 SAMPLE_RATE = 16000
-CHUNK_SIZE = 15600  # 0.975s window required by YAMNet
+CHUNK_SIZE = 15600  # 0.975 seconds buffer for YAMNet
 audio_ring_buffer = np.zeros(CHUNK_SIZE, dtype=np.float32)
 audio_lock = threading.Lock()
 
-# AudioSet class label matching
 GUNSHOT_CLASSES = {
     "Gunshot, gunfire",
     "Cap gun",
@@ -161,9 +160,6 @@ GUNSHOT_CLASSES = {
     "Artillery fire",
     "Machine gun",
     "Explosion",
-    "Fireworks",
-    "Bang",
-    "Burst, pop",
 }
 CHAINSAW_CLASSES = {"Chainsaw", "Sawing", "Lawn mower", "Engine"}
 
@@ -180,80 +176,82 @@ def audio_callback(indata, frames, time_info, status):
 def audio_worker(device_index=None):
   global running, threat_state
 
-  print("[ML] Downloading / Loading YAMNet model from TF-Hub...")
+  print("[ML] Loading Google YAMNet Deep Learning Classifier from TF-Hub...")
   yamnet_model = hub.load("https://tfhub.dev/google/yamnet/1")
   class_map_path = yamnet_model.class_map_path().numpy().decode("utf-8")
 
-  # Correct CSV Parsing: Extracts only the clean display names
-  with open(class_map_path, mode="r", encoding="utf-8") as csv_file:
+  with open(class_map_path) as csv_file:
     reader = csv.reader(csv_file)
     next(reader)  # Skip header row
-    class_names = [row[2].strip() for row in reader]
+    class_names = [display_name for (_, _, display_name) in reader]
 
-  print("[ML] YAMNet model ready! Real-time inspection enabled.\n")
+  print("[ML] YAMNet model initialized successfully! Listening to live mic...")
 
-  stream = sd.InputStream(
-      samplerate=SAMPLE_RATE,
-      blocksize=2048,
-      device=device_index,
-      channels=1,
-      dtype="float32",
-      callback=audio_callback,
-  )
+  try:
+    stream = sd.InputStream(
+        samplerate=SAMPLE_RATE,
+        blocksize=2048,
+        device=device_index,
+        channels=1,
+        dtype="float32",
+        callback=audio_callback,
+    )
+  except Exception as e:
+    print(f"[AUDIO ERROR] Could not open microphone stream: {e}")
+    return
 
   with stream:
     while running:
-      time.sleep(0.2)
+      time.sleep(0.25)
 
       with audio_lock:
         waveform = np.copy(audio_ring_buffer)
 
-      rms = np.sqrt(np.mean(waveform**2))
-      if rms < 0.005:  # Ignore near-zero line silence
+      # 1. Reject Silence / Background noise floor
+      peak_amp = np.max(np.abs(waveform))
+      rms_amp = np.sqrt(np.mean(waveform**2))
+
+      if peak_amp < 0.03:
         continue
 
-      # ML Inference
-      scores, _, _ = yamnet_model(waveform)
-      scores_np = scores.numpy()
+      # 2. Peak normalization to support distant/low-volume phone speaker playback
+      if peak_amp > 0.01:
+        normalized_waveform = waveform / peak_amp
+      else:
+        normalized_waveform = waveform
 
-      # Use np.max across time frames to catch sharp transient gunshots
-      max_scores = np.max(scores_np, axis=0)
-
-      top_3_indices = np.argsort(max_scores)[-3:][::-1]
-      top_predictions = [
-          f"{class_names[i]}: {max_scores[i]*100:.1f}%" for i in top_3_indices
-      ]
-
-      top_class_name = class_names[top_3_indices[0]]
-      top_class_conf = max_scores[top_3_indices[0]] * 100
+      # 3. YAMNet Inference
+      scores, embeddings, spectrogram = yamnet_model(normalized_waveform)
+      mean_scores = np.mean(scores.numpy(), axis=0)
+      top_class_index = np.argmax(mean_scores)
+      top_class_name = class_names[top_class_index]
 
       now = time.time()
       detected_threat = "NONE"
       threat_details = "Ambient Baseline"
       top_confidence = 0.0
 
-      for idx in top_3_indices:
+      # Scan top-5 prediction scores
+      top_5_indices = np.argsort(mean_scores)[-5:][::-1]
+      for idx in top_5_indices:
         c_name = class_names[idx]
-        c_conf = float(max_scores[idx]) * 100
+        c_conf = float(mean_scores[idx]) * 100.0
 
-        if c_name in GUNSHOT_CLASSES and c_conf >= 15.0:
+        # Gunshots: Strict threshold (>= 45%) to prevent coughs/claps/clicks
+        if c_name in GUNSHOT_CLASSES and c_conf >= 45.0:
           detected_threat = "GUNSHOT"
           threat_details = f"YAMNet ML: {c_name} ({c_conf:.1f}%)"
           top_confidence = c_conf
           break
-        elif c_name in CHAINSAW_CLASSES and c_conf >= 18.0:
+
+        # Chainsaws: Calibrated threshold (>= 25%) for phone playback
+        elif c_name in CHAINSAW_CLASSES and c_conf >= 25.0:
           detected_threat = "CHAINSAW"
           threat_details = f"YAMNet ML: {c_name} ({c_conf:.1f}%)"
           top_confidence = c_conf
           break
 
-      # Live status of detected sounds
-      if detected_threat == "NONE" and top_class_conf > 15.0:
-        sys.stdout.write(
-            f"\r[HEARING] {', '.join(top_predictions[:2])}               "
-        )
-        sys.stdout.flush()
-
+      # Latch alert for 3.0 seconds so UI catches the event cleanly
       with state_lock:
         if detected_threat != "NONE":
           threat_state["threat"] = detected_threat
@@ -268,17 +266,75 @@ def audio_worker(device_index=None):
 
 
 # ----------------------------------------------------------------------
-# MAIN LOOP
+# THREAD 3: NON-BLOCKING KEYBOARD HOTKEYS (DEMO INSURANCE)
+# ----------------------------------------------------------------------
+def keyboard_worker():
+  global running, threat_state
+  if not IS_WINDOWS:
+    return
+
+  while running:
+    try:
+      if msvcrt.kbhit():
+        ch = msvcrt.getch()
+        try:
+          key = ch.decode("utf-8", errors="ignore").lower()
+        except Exception:
+          continue
+
+        now = time.time()
+        with state_lock:
+          if key == "c":
+            threat_state["threat"] = "CHAINSAW"
+            threat_state["confidence"] = 94.5
+            threat_state["details"] = "Manual Hotkey Override: Chainsaw"
+            threat_state["expires_at"] = now + 3.0
+            print(
+                "\n[HOTKEY] >>> Triggered CHAINSAW Acoustic Alert (3s latch)"
+                " <<<"
+            )
+          elif key == "g":
+            threat_state["threat"] = "GUNSHOT"
+            threat_state["confidence"] = 98.0
+            threat_state["details"] = "Manual Hotkey Override: Gunshot"
+            threat_state["expires_at"] = now + 3.0
+            print(
+                "\n[HOTKEY] >>> Triggered GUNSHOT Acoustic Alert (3s latch) <<<"
+            )
+          elif key == "f":
+            threat_state["threat"] = "FOREST_FIRE"
+            threat_state["confidence"] = 96.5
+            threat_state["details"] = "Manual Hotkey Override: Forest Fire"
+            threat_state["expires_at"] = now + 3.0
+            print(
+                "\n[HOTKEY] >>> Triggered FOREST_FIRE Thermal Alert (3s latch)"
+                " <<<"
+            )
+          elif key == "n":
+            threat_state["threat"] = "NONE"
+            threat_state["confidence"] = 0.0
+            threat_state["details"] = "Ambient Baseline"
+            threat_state["expires_at"] = 0.0
+            print("\n[HOTKEY] >>> Reset Threat to Normal Baseline <<<")
+      time.sleep(0.05)
+    except Exception:
+      time.sleep(0.1)
+
+
+# ----------------------------------------------------------------------
+# MAIN LOOP: TELEMETRY MERGER & REST API DISPATCHER
 # ----------------------------------------------------------------------
 def main():
   global running
 
   default_detected_port = get_default_port()
-  parser = argparse.ArgumentParser()
+  parser = argparse.ArgumentParser(
+      description="TerraPulse ESP32 & Acoustic IoT Gateway Bridge"
+  )
   parser.add_argument("--port", type=str, default=default_detected_port)
   parser.add_argument("--baud", type=int, default=115200)
   parser.add_argument(
-      "--url", type=str, default="http://localhost:3000/api/telemetry"
+      "--url", type=str, default="http://localhost:3001/api/telemetry"
   )
   parser.add_argument("--node-id", type=str, default="ST-01")
   parser.add_argument("--lat", type=float, default=29.5300)
@@ -287,6 +343,16 @@ def main():
   parser.add_argument("--mic-device", type=int, default=None)
   args = parser.parse_args()
 
+  print("=" * 70)
+  print(" TERRAPULSE ESP32 HARDWARE & YAMNet ACOUSTIC ML GATEWAY ")
+  print("=" * 70)
+  print(f" Target API Endpoint  : {args.url}")
+  print(f" Station Node ID      : {args.node_id}")
+  print(f" Serial Port Target   : {args.port} @ {args.baud} baud")
+  print(" [HOTKEYS] 'c' = Chainsaw | 'g' = Gunshot | 'f' = Fire | 'n' = Normal")
+  print("=" * 70)
+
+  # Start Worker Threads
   t_serial = threading.Thread(
       target=serial_worker, args=(args.port, args.baud), daemon=True
   )
@@ -296,6 +362,9 @@ def main():
       target=audio_worker, args=(args.mic_device,), daemon=True
   )
   t_audio.start()
+
+  t_keys = threading.Thread(target=keyboard_worker, daemon=True)
+  t_keys.start()
 
   http_session = requests.Session()
 
@@ -311,6 +380,7 @@ def main():
         active_threat = threat_state["threat"]
         active_confidence = threat_state["confidence"]
 
+      # Threat Resolution (Acoustics take priority, followed by MQ-2 / DHT11 threshold)
       if active_threat != "NONE":
         threat = active_threat
         confidence = active_confidence
@@ -339,7 +409,7 @@ def main():
             "HTTP 200 OK" if res.status_code == 200 else f"HTTP {res.status_code}"
         )
       except requests.exceptions.RequestException:
-        status_text = "API Offline"
+        status_text = "API Offline (Retrying...)"
 
       mode_badge = "[ESP32-USB]" if is_serial else "[SIMULATED]"
 
@@ -351,8 +421,9 @@ def main():
         )
       else:
         sys.stdout.write(
-            f"\r[LIVE] {mode_badge} {args.node_id} | Temp: {temp:.1f}C | Hum:"
-            f" {hum:.0f}% | Smoke: {smoke:.1f} | Threat: NONE | {status_text}  "
+            f"\r[LIVE] {mode_badge} {args.node_id} | Temp: {temp:.1f}C |"
+            f" Hum: {hum:.0f}% | Smoke: {smoke:.1f} | Threat: NONE |"
+            f" {status_text}   "
         )
         sys.stdout.flush()
 
@@ -360,8 +431,9 @@ def main():
       time.sleep(max(0.05, args.interval - elapsed))
 
   except KeyboardInterrupt:
-    print("\n[SHUTDOWN] Exiting...")
+    print("\n\n[SHUTDOWN] Exiting Gateway Bridge gracefully...")
     running = False
+    time.sleep(0.5)
 
 
 if __name__ == "__main__":
