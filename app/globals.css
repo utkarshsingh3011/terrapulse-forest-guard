@@ -37,38 +37,39 @@ body {
 
 /* Glassmorphism Panel Utilities */
 .glass-panel {
-  background: rgba(15, 23, 42, 0.75);
+  background: rgba(15, 23, 42, 0.82);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
 .glass-panel-subtle {
-  background: rgba(15, 23, 42, 0.6);
+  background: rgba(15, 23, 42, 0.65);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .glass-card {
-  background: rgba(30, 41, 59, 0.45);
+  background: rgba(30, 41, 59, 0.5);
   backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   transition: all 0.2s ease-in-out;
 }
 
 .glass-card:hover {
-  background: rgba(30, 41, 59, 0.65);
-  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(30, 41, 59, 0.7);
+  border-color: rgba(255, 255, 255, 0.16);
 }
 
 /* Soft ambient background */
 .forest-ambient-bg {
   background-color: #080e14;
   background-image: 
-    radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.05) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, rgba(14, 165, 233, 0.04) 0px, transparent 50%);
+    radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.06) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(14, 165, 233, 0.05) 0px, transparent 50%),
+    radial-gradient(at 50% 50%, rgba(244, 63, 94, 0.02) 0px, transparent 60%);
 }
 
 /* Leaflet Map Custom Marker Styles */
@@ -80,8 +81,8 @@ body {
 }
 
 .marker-pulse-green {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   background: rgba(16, 185, 129, 0.2);
   border: 2px solid #10b981;
   border-radius: 50%;
@@ -90,28 +91,29 @@ body {
   align-items: center;
   justify-content: center;
   transition: transform 0.2s ease;
+  animation: pulseSoftGreen 3s infinite;
 }
 
 .marker-pulse-red {
-  width: 38px;
-  height: 38px;
-  background: rgba(244, 63, 94, 0.25);
+  width: 40px;
+  height: 40px;
+  background: rgba(244, 63, 94, 0.28);
   border: 2px solid #f43f5e;
   border-radius: 50%;
-  box-shadow: 0 0 20px rgba(244, 63, 94, 0.6);
-  animation: pulseSoftRed 1.8s infinite;
+  box-shadow: 0 0 22px rgba(244, 63, 94, 0.7);
+  animation: pulseSoftRed 1.6s infinite;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .marker-pulse-amber {
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   background: rgba(245, 158, 11, 0.25);
   border: 2px solid #f59e0b;
   border-radius: 50%;
-  box-shadow: 0 0 16px rgba(245, 158, 11, 0.5);
+  box-shadow: 0 0 18px rgba(245, 158, 11, 0.55);
   animation: pulseSoftAmber 2s infinite;
   display: flex;
   align-items: center;
@@ -120,12 +122,12 @@ body {
 
 @keyframes pulseSoftGreen {
   0% { transform: scale(0.96); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
-  70% { transform: scale(1.08); box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+  70% { transform: scale(1.06); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
   100% { transform: scale(0.96); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
 }
 
 @keyframes pulseSoftRed {
-  0% { transform: scale(0.92); box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.7); }
+  0% { transform: scale(0.92); box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.8); }
   50% { transform: scale(1.15); box-shadow: 0 0 0 14px rgba(244, 63, 94, 0); }
   100% { transform: scale(0.92); box-shadow: 0 0 0 0 rgba(244, 63, 94, 0); }
 }
@@ -142,34 +144,75 @@ body {
 }
 
 @keyframes threatPulseSoft {
-  0% { stroke-opacity: 0.8; fill-opacity: 0.15; stroke-width: 1.5px; }
-  100% { stroke-opacity: 0.35; fill-opacity: 0.3; stroke-width: 3px; }
+  0% { stroke-opacity: 0.85; fill-opacity: 0.15; stroke-width: 1.5px; }
+  100% { stroke-opacity: 0.35; fill-opacity: 0.35; stroke-width: 3.5px; }
+}
+
+/* Equalizer animations for acoustic spectrum bars */
+@keyframes eqBar1 {
+  0%, 100% { height: 20%; }
+  50% { height: 85%; }
+}
+@keyframes eqBar2 {
+  0%, 100% { height: 40%; }
+  50% { height: 95%; }
+}
+@keyframes eqBar3 {
+  0%, 100% { height: 15%; }
+  50% { height: 65%; }
+}
+@keyframes eqBar4 {
+  0%, 100% { height: 60%; }
+  50% { height: 100%; }
+}
+
+.animate-eq-1 { animation: eqBar1 1.2s ease-in-out infinite; }
+.animate-eq-2 { animation: eqBar2 0.9s ease-in-out infinite; }
+.animate-eq-3 { animation: eqBar3 1.4s ease-in-out infinite; }
+.animate-eq-4 { animation: eqBar4 0.75s ease-in-out infinite; }
+
+/* Radar scanner sweep line */
+@keyframes radarSweep {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.animate-radar-sweep {
+  animation: radarSweep 4s linear infinite;
+  transform-origin: center;
+}
+
+/* Tactical glowing text utility */
+.glow-emerald {
+  text-shadow: 0 0 12px rgba(16, 185, 129, 0.6);
+}
+.glow-rose {
+  text-shadow: 0 0 12px rgba(244, 63, 94, 0.7);
+}
+.glow-amber {
+  text-shadow: 0 0 12px rgba(245, 158, 11, 0.6);
+}
+.glow-sky {
+  text-shadow: 0 0 12px rgba(56, 189, 248, 0.6);
 }
 
 /* Leaflet Popup Humanistic Overrides */
 .leaflet-popup-content-wrapper {
   background: rgba(15, 23, 42, 0.95) !important;
-  color: #f1f5f9 !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  border-radius: 14px !important;
-  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.6) !important;
-  backdrop-filter: blur(16px) !important;
-  -webkit-backdrop-filter: blur(16px) !important;
+  color: #f8fafc !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6) !important;
+  backdrop-filter: blur(12px) !important;
   padding: 0 !important;
 }
 
-.leaflet-popup-tip {
-  background: #0f172a !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-}
-
 .leaflet-popup-content {
-  margin: 14px 16px !important;
+  margin: 0 !important;
   line-height: 1.4 !important;
 }
 
-.leaflet-container {
-  background: #080e14 !important;
-  font-family: inherit !important;
+.leaflet-popup-tip {
+  background: rgba(15, 23, 42, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
 }
-

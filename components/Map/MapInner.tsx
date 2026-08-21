@@ -27,11 +27,12 @@ import {
   Navigation,
   ExternalLink,
   MapPin,
-  Maximize2,
   Compass,
   Layers,
-  Eye,
-  EyeOff
+  Plane,
+  Car,
+  Footprints,
+  Activity
 } from "lucide-react";
 import { soundFX } from "@/lib/audio";
 
@@ -44,7 +45,7 @@ interface MapInnerProps {
   activeAlerts: ThreatAlert[];
 }
 
-// Subcomponent to animate/fly map view when a node is selected
+// Subcomponent to fly map view when a node is selected
 function MapController({ selectedNode }: { selectedNode: NodeData | null }) {
   const map = useMap();
   useEffect(() => {
@@ -58,7 +59,7 @@ function MapController({ selectedNode }: { selectedNode: NodeData | null }) {
   return null;
 }
 
-// Subcomponent for custom map buttons (Recenter, Zoom, etc.)
+// Subcomponent for custom map buttons (Recenter)
 function MapCustomControls({ defaultCenter }: { defaultCenter: [number, number] }) {
   const map = useMap();
   return (
@@ -68,10 +69,10 @@ function MapCustomControls({ defaultCenter }: { defaultCenter: [number, number] 
           soundFX.playBlip();
           map.flyTo(defaultCenter, 13, { duration: 1 });
         }}
-        className="p-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-white/10 text-slate-300 hover:text-white shadow-lg backdrop-blur-md transition-all flex items-center justify-center"
-        title="Recenter Map View"
+        className="p-2.5 rounded-2xl bg-slate-900/90 hover:bg-slate-800 border border-white/15 text-slate-300 hover:text-white shadow-xl backdrop-blur-md transition-all flex items-center justify-center group"
+        title="Recenter Map View to Jim Corbett Reserve"
       >
-        <Compass className="w-4 h-4 text-emerald-400" />
+        <Compass className="w-5 h-5 text-emerald-400 group-hover:rotate-45 transition-transform" />
       </button>
     </div>
   );
@@ -89,7 +90,7 @@ export const MapInner: React.FC<MapInnerProps> = ({
   const defaultCenter: [number, number] = [29.5300, 78.7747];
   const [showRadius, setShowRadius] = useState(true);
 
-  // Helper to create dynamic custom Leaflet icons
+  // Helper to create dynamic custom Leaflet icons with pulsing status rings
   const createNodeIcon = (node: NodeData) => {
     const isAlert = node.activeThreat !== "NONE";
     const threatClass = isAlert 
@@ -105,7 +106,7 @@ export const MapInner: React.FC<MapInnerProps> = ({
       className: "custom-node-marker",
       html: `
         <div class="${threatClass}">
-          <span style="font-size: 14px;">${isAlert ? "⚠️" : "📡"}</span>
+          <span style="font-size: 15px;">${isAlert ? "⚠️" : "📡"}</span>
           <div style="
             position: absolute; 
             bottom: -22px; 
@@ -128,35 +129,43 @@ export const MapInner: React.FC<MapInnerProps> = ({
           </div>
         </div>
       `,
-      iconSize: [38, 38],
-      iconAnchor: [19, 19],
+      iconSize: [40, 40],
+      iconAnchor: [20, 20],
       popupAnchor: [0, -22],
     });
   };
 
-  const rangerIcon = useMemo(() => {
+  // Create customized tactical icons for ranger assets (Vehicles, Drones, Foot Patrols)
+  const createRangerIcon = (ranger: RangerUnit) => {
+    const isDrone = ranger.id.includes("DRONE");
+    const isVehicle = ranger.id.includes("BRAVO");
+    const emoji = isDrone ? "🛸" : isVehicle ? "🚙" : "🥾";
+    const borderColor = isDrone ? "#38bdf8" : isVehicle ? "#f59e0b" : "#10b981";
+    const bgGlow = isDrone ? "rgba(56, 189, 248, 0.25)" : isVehicle ? "rgba(245, 158, 11, 0.25)" : "rgba(16, 185, 129, 0.25)";
+
     return L.divIcon({
       className: "custom-ranger-marker",
       html: `
         <div style="
-          width: 34px; 
-          height: 34px; 
-          background: rgba(14, 165, 233, 0.25); 
-          border: 2px solid #38bdf8; 
+          width: 36px; 
+          height: 36px; 
+          background: ${bgGlow}; 
+          border: 2px solid ${borderColor}; 
           border-radius: 50%; 
           display: flex; 
           align-items: center; 
           justify-content: center; 
-          box-shadow: 0 0 15px rgba(56, 189, 248, 0.5);
+          box-shadow: 0 0 15px ${borderColor};
+          transition: transform 0.2s ease;
         ">
-          <span style="font-size: 14px;">🚙</span>
+          <span style="font-size: 15px;">${emoji}</span>
         </div>
       `,
-      iconSize: [34, 34],
-      iconAnchor: [17, 17],
+      iconSize: [36, 36],
+      iconAnchor: [18, 18],
       popupAnchor: [0, -20],
     });
-  }, []);
+  };
 
   const getThreatLabel = (threat: ThreatCategory) => {
     switch (threat) {
@@ -211,7 +220,7 @@ export const MapInner: React.FC<MapInnerProps> = ({
           </LayersControl.BaseLayer>
         </LayersControl>
 
-        {/* Threat Radius Circles */}
+        {/* Threat Radius Circles with Radar Pulse Ripple */}
         {showRadius && nodes.map((node) => {
           if (node.activeThreat !== "NONE" && node.threatRadius > 0) {
             const isFire = node.activeThreat === "FOREST_FIRE";
@@ -225,9 +234,9 @@ export const MapInner: React.FC<MapInnerProps> = ({
                 pathOptions={{
                   color: circleColor,
                   fillColor: circleColor,
-                  fillOpacity: 0.2,
-                  weight: 1.5,
-                  dashArray: "5, 5",
+                  fillOpacity: 0.22,
+                  weight: 2,
+                  dashArray: "6, 6",
                   className: "leaflet-threat-circle",
                 }}
               >
@@ -235,10 +244,10 @@ export const MapInner: React.FC<MapInnerProps> = ({
                   <div className="text-xs text-slate-100 p-1">
                     <div className="font-semibold text-rose-400 flex items-center gap-1.5 mb-1">
                       <Flame className="w-4 h-4" />
-                      Estimated Radius: {node.threatRadius}m
+                      Estimated Threat Radius: {node.threatRadius}m
                     </div>
                     <p className="text-[11px] text-slate-300">
-                      Sensor detection reach around {node.name}.
+                      Acoustic/thermal dispersion zone around {node.name}.
                     </p>
                   </div>
                 </Popup>
@@ -248,7 +257,7 @@ export const MapInner: React.FC<MapInnerProps> = ({
           return null;
         })}
 
-        {/* Station Markers */}
+        {/* Sentinel Station Node Markers */}
         {nodes.map((node) => {
           const threatInfo = getThreatLabel(node.activeThreat);
           const isAlert = node.activeThreat !== "NONE";
@@ -303,21 +312,21 @@ export const MapInner: React.FC<MapInnerProps> = ({
                     <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/50 border border-white/5">
                       <div className="flex items-center gap-2 text-slate-300">
                         <Wind className="w-3.5 h-3.5 text-amber-400" />
-                        <span>Air Quality</span>
+                        <span>Air Quality (VOC)</span>
                       </div>
                       <span className={`font-semibold ${node.activeThreat === "FOREST_FIRE" ? "text-rose-400" : "text-emerald-400"}`}>
-                        {node.activeThreat === "FOREST_FIRE" ? "Smoke Detected" : "Clean Air"}
+                        {node.activeThreat === "FOREST_FIRE" ? "Smoke Detected" : `${node.telemetry.vocGas.toFixed(1)} kΩ`}
                       </span>
                     </div>
 
-                    {/* Card 3: Battery */}
+                    {/* Card 3: Battery & Solar */}
                     <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/50 border border-white/5">
                       <div className="flex items-center gap-2 text-slate-300">
                         <Battery className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>Battery &amp; Backup</span>
+                        <span>LiFePO4 Battery</span>
                       </div>
                       <span className="font-semibold text-emerald-400">
-                        {node.telemetry.battery}% • ~{Math.max(1, Math.round((node.telemetry.battery / 100) * 14))}d
+                        {node.telemetry.battery}% ({node.solarInputWatts}W Solar)
                       </span>
                     </div>
 
@@ -325,10 +334,10 @@ export const MapInner: React.FC<MapInnerProps> = ({
                     <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/50 border border-white/5">
                       <div className="flex items-center gap-2 text-slate-300">
                         <Radio className="w-3.5 h-3.5 text-sky-400" />
-                        <span>Mesh Signal</span>
+                        <span>LoRa Mesh (IN865)</span>
                       </div>
                       <span className="font-semibold text-sky-400">
-                        Strong (LoRa IN865)
+                        {node.telemetry.rssi} dBm
                       </span>
                     </div>
                   </div>
@@ -349,23 +358,31 @@ export const MapInner: React.FC<MapInnerProps> = ({
           );
         })}
 
-        {/* Ranger Units */}
+        {/* Ranger Tactical Units */}
         {rangerUnits.map((ranger) => (
           <Marker
             key={ranger.id}
             position={[ranger.lat, ranger.lng]}
-            icon={rangerIcon}
+            icon={createRangerIcon(ranger)}
           >
             <Popup>
-              <div className="text-xs text-slate-100 p-1 w-60 font-sans">
-                <div className="font-bold text-sky-400 flex items-center gap-1.5 mb-1 text-sm">
-                  <Navigation className="w-4 h-4" />
+              <div className="text-xs text-slate-100 p-1 w-64 font-sans">
+                <div className="font-bold text-sky-300 flex items-center gap-1.5 mb-1 text-sm">
+                  <Navigation className="w-4 h-4 text-sky-400" />
                   {ranger.callsign}
                 </div>
                 <div className="text-[11px] text-slate-300 mb-2">{ranger.team}</div>
-                <div className="flex items-center justify-between text-xs bg-slate-900 p-2 rounded-lg border border-white/5">
-                  <span className="text-slate-400">Patrol Status:</span>
-                  <span className="font-semibold text-emerald-400">{ranger.status}</span>
+                <div className="space-y-1 bg-slate-900/90 p-2.5 rounded-xl border border-white/5 text-[11px]">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400">Unit Status:</span>
+                    <span className={`font-semibold ${ranger.status === "EN_ROUTE" ? "text-amber-400 animate-pulse" : "text-emerald-400"}`}>
+                      {ranger.status}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-slate-400">
+                    <span>GPS Coordinates:</span>
+                    <span className="font-mono text-slate-200">{ranger.lat.toFixed(4)}°N, {ranger.lng.toFixed(4)}°E</span>
+                  </div>
                 </div>
               </div>
             </Popup>
@@ -373,14 +390,13 @@ export const MapInner: React.FC<MapInnerProps> = ({
         ))}
       </MapContainer>
 
-      {/* Clean Floating Map Info Badge */}
+      {/* Floating Tactical Location Badge */}
       <div className="absolute top-4 right-4 z-20 flex items-center gap-2 text-xs">
-        <div className="px-3 py-1.5 rounded-full bg-slate-950/80 border border-white/10 text-slate-300 backdrop-blur-md flex items-center gap-2 shadow-lg">
+        <div className="px-3.5 py-1.5 rounded-full bg-slate-950/85 border border-white/15 text-slate-200 backdrop-blur-md flex items-center gap-2 shadow-xl font-medium">
           <MapPin className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Jim Corbett Reserve (29.53° N, 78.77° E)</span>
+          <span>Jim Corbett National Park (29.53° N, 78.77° E)</span>
         </div>
       </div>
     </div>
   );
 };
-
