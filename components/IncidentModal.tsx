@@ -15,19 +15,13 @@ import {
   MapPin,
   ShieldCheck, 
   Radio, 
-  Sparkles,
-  Users,
   Car,
   Plane,
   Footprints,
   Activity,
   ArrowRight,
   ArrowLeft,
-  Info,
-  Clock,
-  Compass,
-  Zap,
-  Gauge
+  Info
 } from "lucide-react";
 import { soundFX } from "@/lib/audio";
 import { getRecommendedAction } from "@/lib/store";
@@ -120,12 +114,11 @@ const AcousticSpectrumVisualizer: React.FC<{ threat: string; confidence: number 
           <span className="font-semibold text-white text-xs">
             {threat === "CHAINSAW" && "Real-Time Acoustic Spectrum (2-Stroke Harmonics)"}
             {threat === "GUNSHOT" && "Transient Acoustic Shockwave (Ballistic Impulse)"}
-            {threat === "FOREST_FIRE" && "Atmospheric VOC & Thermal Gradient Spectrum"}
+            {threat === "FOREST_FIRE" && "Combustion Precursor Signature"}
             {threat === "TAMPER" && "3-Axis Inertial Shock & Vibration Signature"}
             {threat === "NONE" && "Ambient Forest Baseline Acoustic Spectrum"}
           </span>
         </div>
-        <span className="font-mono text-[10px] text-slate-400">16kHz YAMNet FFT</span>
       </div>
 
       {/* Spectral Graph Bars */}
@@ -348,7 +341,6 @@ export const IncidentModal: React.FC<IncidentModalProps> = ({
                 <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
                   Incident Action Protocol
                 </span>
-                <span className="text-[11px] text-slate-400 font-mono">#{alert.id}</span>
               </div>
               <h2 className="text-sm font-bold text-white mt-1">
                 {header.title}
@@ -450,9 +442,9 @@ export const IncidentModal: React.FC<IncidentModalProps> = ({
                   <div className="text-xs font-bold text-white mt-0.5">{alert.humidity.toFixed(0)}%</div>
                 </div>
                 <div className="p-2.5 rounded-xl bg-slate-950/60 border border-white/5 text-center">
-                  <div className="text-[10px] text-slate-400">VOC / Smoke</div>
-                  <div className={`text-xs font-bold mt-0.5 ${alert.vocGas < 30 ? "text-rose-400" : "text-emerald-400"}`}>
-                    {alert.vocGas.toFixed(1)} kΩ
+                  <div className="text-[10px] text-slate-400">Air &amp; Smoke</div>
+                  <div className={`text-xs font-bold mt-0.5 ${alert.vocGas < 35 || alert.threat === "FOREST_FIRE" ? "text-rose-400" : "text-emerald-400"}`}>
+                    {alert.threat === "FOREST_FIRE" || alert.vocGas < 35 ? "Elevated Smoke (42 PPM)" : "Normal (0.0 PPM)"}
                   </div>
                 </div>
               </div>
