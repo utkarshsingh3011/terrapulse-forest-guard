@@ -7,6 +7,7 @@ import {
   Marker, 
   Popup, 
   Circle, 
+  Polyline,
   useMap, 
   LayersControl, 
   ScaleControl 
@@ -26,7 +27,9 @@ import {
   Navigation,
   ExternalLink,
   MapPin,
-  Compass
+  Compass,
+  Zap,
+  Cpu
 } from "lucide-react";
 import { soundFX } from "@/lib/audio";
 
@@ -82,44 +85,131 @@ export const MapInner: React.FC<MapInnerProps> = ({
 }) => {
   // Center coordinates for Jim Corbett National Park
   const defaultCenter: [number, number] = [29.5300, 78.7747];
-  const [showRadius, setShowRadius] = useState(true);
 
   // Helper to create dynamic custom Leaflet icons with pulsing status rings
   const createNodeIcon = (node: NodeData) => {
     const isAlert = node.activeThreat !== "NONE";
+    const isHardware = node.id === "Node-01" || node.id === "ST-01";
+    
     const threatClass = isAlert 
       ? "marker-pulse-red" 
       : node.status === "DEGRADED" 
         ? "marker-pulse-amber" 
-        : "marker-pulse-green";
+        : isHardware 
+          ? "marker-pulse-green ring-2 ring-cyan-400/60 shadow-lg shadow-cyan-500/50" 
+          : "marker-pulse-green";
 
-    const statusDot = isAlert ? "#f43f5e" : "#10b981";
+    const statusDot = isAlert ? "#f43f5e" : isHardware ? "#06b6d4" : "#10b981";
     const shortId = node.id.replace("Node-0", "ST-").replace("Node-", "ST-");
+
+    const hardwareTag = isHardware ? `
+      <div style="
+        position: absolute;
+        top: -18px;
+        white-space: nowrap;
+        background: rgba(6, 182, 212, 0.95);
+        color: #080e14;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 9px;
+        font-weight: 800;
+        padding: 1px 6px;
+        border-radius: 9999px;
+        box-shadow: 0 0 10px rgba(6, 182, 212, 0.6);
+        display: flex;
+        align-items: center;
+        gap: 3px;
+      ">
+        <span>⚡ ESP32 Live Hardware</span>
+      </div>
+    ` : "";
 
     return L.divIcon({
       className: "custom-node-marker",
       html: `
-        <div class="${threatClass}">
-          <span style="font-size: 15px;">${isAlert ? "⚠️" : "📡"}</span>
+        <div style="position: relative; display: flex; flex-direction: column; align-items: center;">
+          ${hardwareTag}
+          <div class="${threatClass}">
+            <span style="font-size: 15px;">${isAlert ? "⚠️" : isHardware ? "⚡" : "📡"}</span>
+            <div style="
+              position: absolute; 
+              bottom: -22px; 
+              white-space: nowrap; 
+              background: rgba(15, 23, 42, 0.95); 
+              border: 1px solid ${isHardware ? "rgba(6, 182, 212, 0.5)" : "rgba(255, 255, 255, 0.15)"}; 
+              color: #f1f5f9; 
+              font-family: 'Plus Jakarta Sans', sans-serif; 
+              font-size: 11px; 
+              font-weight: 600; 
+              padding: 2px 8px; 
+              border-radius: 9999px;
+              box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+              display: flex;
+              align-items: center;
+              gap: 4px;
+            ">
+              <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:${statusDot};"></span>
+              ${shortId}
+            </div>
+          </div>
+        </div>
+      `,
+      iconSize: [44, 44],
+      iconAnchor: [22, 22],
+      popupAnchor: [0, -22],
+    });
+  };
+
+  // Create customized tactical icons for ranger assets with readable micro-badges
+  const createRangerIcon = (ranger: RangerUnit) => {
+    const isDrone = ranger.id.includes("DRONE");
+    const isVehicle = ranger.id.includes("BRAVO");
+    const emoji = isDrone ? "🛸" : isVehicle ? "🚙" : "🥾";
+    const borderColor = isDrone ? "#38bdf8" : isVehicle ? "#f59e0b" : "#10b981";
+    const bgGlow = isDrone ? "rgba(56, 189, 248, 0.25)" : isVehicle ? "rgba(245, 158, 11, 0.25)" : "rgba(16, 185, 129, 0.25)";
+    
+    // Callout labels per requirement 4
+    const label = isVehicle 
+      ? "Patrol Unit Alpha (4WD)" 
+      : isDrone 
+        ? "SkyEye Drone (Patrol Sector 2)" 
+        : "Dhikala Foot Patrol (4 Rangers)";
+
+    return L.divIcon({
+      className: "custom-ranger-marker",
+      html: `
+        <div style="position: relative; display: flex; flex-direction: column; align-items: center; pointer-events: auto;">
           <div style="
-            position: absolute; 
-            bottom: -22px; 
+            position: absolute;
+            top: -20px;
             white-space: nowrap; 
             background: rgba(15, 23, 42, 0.95); 
-            border: 1px solid rgba(255, 255, 255, 0.15); 
+            border: 1px solid ${borderColor}; 
             color: #f1f5f9; 
             font-family: 'Plus Jakarta Sans', sans-serif; 
-            font-size: 11px; 
-            font-weight: 600; 
-            padding: 2px 8px; 
+            font-size: 10px; 
+            font-weight: 700; 
+            padding: 1.5px 7px; 
             border-radius: 9999px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.6);
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 3px;
           ">
-            <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:${statusDot};"></span>
-            ${shortId}
+            <span>${label}</span>
+          </div>
+          <div style="
+            width: 36px; 
+            height: 36px; 
+            background: ${bgGlow}; 
+            border: 2px solid ${borderColor}; 
+            border-radius: 50%; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            box-shadow: 0 0 15px ${borderColor};
+            transition: transform 0.2s ease;
+          ">
+            <span style="font-size: 15px;">${emoji}</span>
           </div>
         </div>
       `,
@@ -129,37 +219,31 @@ export const MapInner: React.FC<MapInnerProps> = ({
     });
   };
 
-  // Create customized tactical icons for ranger assets (Vehicles, Drones, Foot Patrols)
-  const createRangerIcon = (ranger: RangerUnit) => {
-    const isDrone = ranger.id.includes("DRONE");
-    const isVehicle = ranger.id.includes("BRAVO");
-    const emoji = isDrone ? "🛸" : isVehicle ? "🚙" : "🥾";
-    const borderColor = isDrone ? "#38bdf8" : isVehicle ? "#f59e0b" : "#10b981";
-    const bgGlow = isDrone ? "rgba(56, 189, 248, 0.25)" : isVehicle ? "rgba(245, 158, 11, 0.25)" : "rgba(16, 185, 129, 0.25)";
-
-    return L.divIcon({
-      className: "custom-ranger-marker",
-      html: `
-        <div style="
-          width: 36px; 
-          height: 36px; 
-          background: ${bgGlow}; 
-          border: 2px solid ${borderColor}; 
-          border-radius: 50%; 
-          display: flex; 
-          align-items: center; 
-          justify-content: center; 
-          box-shadow: 0 0 15px ${borderColor};
-          transition: transform 0.2s ease;
-        ">
-          <span style="font-size: 15px;">${emoji}</span>
-        </div>
-      `,
-      iconSize: [36, 36],
-      iconAnchor: [18, 18],
-      popupAnchor: [0, -20],
+  // Node coordinate lookup for visual LoRa mesh topology
+  const nodeMap = useMemo(() => {
+    const map = new Map<string, NodeData>();
+    nodes.forEach((n) => {
+      map.set(n.id, n);
+      if (n.id === "Node-01") map.set("ST-01", n);
+      if (n.id === "Node-02") map.set("ST-02", n);
+      if (n.id === "Node-03") map.set("ST-03", n);
+      if (n.id === "Node-04") map.set("ST-04", n);
     });
-  };
+    return map;
+  }, [nodes]);
+
+  const n1 = nodeMap.get("Node-01") || nodeMap.get("ST-01") || nodes[0];
+  const n2 = nodeMap.get("Node-02") || nodeMap.get("ST-02") || nodes[1];
+  const n3 = nodeMap.get("Node-03") || nodeMap.get("ST-03") || nodes[2];
+  const n4 = nodeMap.get("Node-04") || nodeMap.get("ST-04") || nodes[3];
+
+  const meshSegments = useMemo(() => {
+    const segs: [number, number][][] = [];
+    if (n1 && n2) segs.push([[n1.lat, n1.lng], [n2.lat, n2.lng]]);
+    if (n1 && n3) segs.push([[n1.lat, n1.lng], [n3.lat, n3.lng]]);
+    if (n3 && n4) segs.push([[n3.lat, n3.lng], [n4.lat, n4.lng]]);
+    return segs;
+  }, [n1, n2, n3, n4]);
 
   return (
     <div className="relative w-full h-full">
@@ -199,34 +283,57 @@ export const MapInner: React.FC<MapInnerProps> = ({
           </LayersControl.BaseLayer>
         </LayersControl>
 
-        {/* Threat Radius Circles with Radar Pulse Ripple */}
-        {showRadius && nodes.map((node) => {
-          if (node.activeThreat !== "NONE" && node.threatRadius > 0) {
+        {/* 1. Visual LoRa Mesh Topology Lines (ST-1 -> ST-2, ST-1 -> ST-3, ST-3 -> ST-4) */}
+        {meshSegments.map((seg, idx) => (
+          <Polyline
+            key={`mesh-link-${idx}`}
+            positions={seg}
+            pathOptions={{
+              color: "#10b981",
+              weight: 2.5,
+              opacity: 0.55,
+              dashArray: "6, 8",
+            }}
+          >
+            <Popup>
+              <div className="text-xs p-1 text-slate-200">
+                <strong className="text-emerald-400 block font-semibold">LoRa Mesh Backhaul Link</strong>
+                <span className="text-[11px] text-slate-400">Sub-GHz IN865 (865.2 MHz) • Non-Line-of-Sight</span>
+              </div>
+            </Popup>
+          </Polyline>
+        ))}
+
+        {/* 2. Dynamic 500m Threat Radius Pulsing Circles */}
+        {nodes.map((node) => {
+          if (node.activeThreat !== "NONE") {
             const isFire = node.activeThreat === "FOREST_FIRE";
-            const circleColor = isFire ? "#f43f5e" : node.activeThreat === "GUNSHOT" ? "#fb7185" : "#f59e0b";
+            const isGunshot = node.activeThreat === "GUNSHOT";
+            const circleColor = isFire ? "#f43f5e" : isGunshot ? "#fb7185" : "#f59e0b";
+            const radius = node.threatRadius && node.threatRadius > 0 ? node.threatRadius : 500;
 
             return (
               <Circle
                 key={`threat-circle-${node.id}`}
                 center={[node.lat, node.lng]}
-                radius={node.threatRadius}
+                radius={radius}
                 pathOptions={{
                   color: circleColor,
                   fillColor: circleColor,
-                  fillOpacity: 0.22,
-                  weight: 2,
+                  fillOpacity: 0.25,
+                  weight: 2.5,
                   dashArray: "6, 6",
                   className: "leaflet-threat-circle",
                 }}
               >
                 <Popup>
                   <div className="text-xs text-slate-100 p-1">
-                    <div className="font-semibold text-rose-400 flex items-center gap-1.5 mb-1">
+                    <div className="font-bold text-rose-400 flex items-center gap-1.5 mb-1">
                       <Flame className="w-4 h-4" />
-                      Estimated Threat Radius: {node.threatRadius}m
+                      Active Threat Radius: {radius}m
                     </div>
                     <p className="text-[11px] text-slate-300">
-                      Acoustic/thermal dispersion zone around {node.name}.
+                      {node.activeThreat.replace("_", " ")} dispersion radius around {node.name}.
                     </p>
                   </div>
                 </Popup>
@@ -236,9 +343,10 @@ export const MapInner: React.FC<MapInnerProps> = ({
           return null;
         })}
 
-        {/* Sentinel Station Node Markers */}
+        {/* 3. Sentinel Station Node Markers */}
         {nodes.map((node) => {
           const isAlert = node.activeThreat !== "NONE";
+          const isHardware = node.id === "Node-01" || node.id === "ST-01";
 
           return (
             <Marker
@@ -254,7 +362,7 @@ export const MapInner: React.FC<MapInnerProps> = ({
             >
               <Popup>
                 <div className="text-xs w-64 text-slate-100 font-sans p-1">
-                  {/* Clean Simple Header: Node-01 (Dhikala Ridge) + Status */}
+                  {/* Header: Node-01 (Dhikala Ridge) + Status */}
                   <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2">
                     <span className="font-bold text-white text-xs">
                       {node.id} ({node.name.replace("Post", "").trim()})
@@ -267,6 +375,14 @@ export const MapInner: React.FC<MapInnerProps> = ({
                       {isAlert ? "⚠️ Threat Alert" : "🟢 Healthy"}
                     </span>
                   </div>
+
+                  {/* Hardware Sentinel Indicator Badge */}
+                  {isHardware && (
+                    <div className="mb-2 p-1.5 rounded-lg bg-cyan-950/70 border border-cyan-500/30 text-cyan-300 font-bold text-[10px] flex items-center justify-center gap-1.5 shadow-sm">
+                      <Zap className="w-3 h-3 text-cyan-400" />
+                      <span>ESP32 Live Hardware Gateway (ST-01)</span>
+                    </div>
+                  )}
 
                   {/* 3 Essential Human Metrics */}
                   <div className="space-y-1.5 bg-slate-900/80 p-2 rounded-xl border border-white/5 text-[11px] mb-2.5">
@@ -312,7 +428,7 @@ export const MapInner: React.FC<MapInnerProps> = ({
           );
         })}
 
-        {/* Ranger Tactical Units */}
+        {/* 4. Patrol Tactical Assets */}
         {rangerUnits.map((ranger) => (
           <Marker
             key={ranger.id}
@@ -327,7 +443,7 @@ export const MapInner: React.FC<MapInnerProps> = ({
                 </div>
                 <div className="flex items-center justify-between text-xs bg-slate-900 p-2 rounded-lg border border-white/5 mt-1">
                   <span className="text-slate-400">Status:</span>
-                  <span className={`font-semibold ${ranger.status === "EN_ROUTE" ? "text-amber-400" : "text-emerald-400"}`}>
+                  <span className={`font-semibold ${ranger.status === "EN_ROUTE" ? "text-amber-400 animate-pulse" : "text-emerald-400"}`}>
                     {ranger.status}
                   </span>
                 </div>
@@ -337,11 +453,12 @@ export const MapInner: React.FC<MapInnerProps> = ({
         ))}
       </MapContainer>
 
-      {/* Floating Tactical Location Badge */}
+      {/* Floating Tactical Location & Mesh Badge */}
       <div className="absolute top-4 right-4 z-20 flex items-center gap-2 text-xs">
-        <div className="px-3 py-1 rounded-full bg-slate-950/85 border border-white/15 text-slate-200 backdrop-blur-md flex items-center gap-1.5 shadow-xl text-[11px] font-medium">
+        <div className="px-3 py-1 rounded-full bg-slate-950/85 border border-white/15 text-slate-200 backdrop-blur-md flex items-center gap-2 shadow-xl text-[11px] font-medium">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
           <MapPin className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Jim Corbett National Park (29.53° N, 78.77° E)</span>
+          <span>Jim Corbett National Park • LoRa Mesh Active</span>
         </div>
       </div>
     </div>

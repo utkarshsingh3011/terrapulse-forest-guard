@@ -152,6 +152,9 @@ export const AlertsFeed: React.FC<AlertsFeedProps> = ({
                   </span>
                 )}
               </h2>
+              <div className="text-[10px] text-emerald-400 font-mono mt-0.5 flex items-center gap-1 font-medium">
+                <span>Avg Dispatch Window: 38s</span>
+              </div>
             </div>
           </div>
 
