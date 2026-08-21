@@ -374,6 +374,7 @@ export default function RangerCommandDashboard() {
           onDispatch={(alertId) => handleDispatch(alertId)}
           onAcknowledge={(alertId) => handleAcknowledge(alertId)}
           onSelectNodeById={handleSelectNodeById}
+          onOpenModal={(alert) => setActiveIncidentModal(alert)}
           isCollapsed={!isSidebarOpen}
           onToggleCollapse={() => setIsSidebarOpen(false)}
         />

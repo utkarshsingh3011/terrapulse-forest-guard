@@ -22,17 +22,11 @@ import {
   Battery, 
   Wind, 
   Thermometer, 
-  Droplets, 
   ShieldCheck, 
   Navigation,
   ExternalLink,
   MapPin,
-  Compass,
-  Layers,
-  Plane,
-  Car,
-  Footprints,
-  Activity
+  Compass
 } from "lucide-react";
 import { soundFX } from "@/lib/audio";
 
@@ -167,21 +161,6 @@ export const MapInner: React.FC<MapInnerProps> = ({
     });
   };
 
-  const getThreatLabel = (threat: ThreatCategory) => {
-    switch (threat) {
-      case "FOREST_FIRE":
-        return { label: "Thermal & Smoke Anomaly", icon: <Flame className="w-3.5 h-3.5 text-rose-400" />, color: "text-rose-300 border-rose-500/30 bg-rose-500/15" };
-      case "CHAINSAW":
-        return { label: "Chainsaw Sound Match", icon: <Axe className="w-3.5 h-3.5 text-amber-400" />, color: "text-amber-300 border-amber-500/30 bg-amber-500/15" };
-      case "GUNSHOT":
-        return { label: "Gunshot Acoustic Shock", icon: <Volume2 className="w-3.5 h-3.5 text-rose-400" />, color: "text-rose-300 border-rose-500/30 bg-rose-500/15" };
-      case "TAMPER":
-        return { label: "Station Physical Tilt", icon: <AlertTriangle className="w-3.5 h-3.5 text-sky-400" />, color: "text-sky-300 border-sky-500/30 bg-sky-500/15" };
-      default:
-        return { label: "Station Healthy • Normal", icon: <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />, color: "text-emerald-300 border-emerald-500/25 bg-emerald-500/15" };
-    }
-  };
-
   return (
     <div className="relative w-full h-full">
       <MapContainer
@@ -259,7 +238,6 @@ export const MapInner: React.FC<MapInnerProps> = ({
 
         {/* Sentinel Station Node Markers */}
         {nodes.map((node) => {
-          const threatInfo = getThreatLabel(node.activeThreat);
           const isAlert = node.activeThreat !== "NONE";
 
           return (
@@ -275,82 +253,58 @@ export const MapInner: React.FC<MapInnerProps> = ({
               }}
             >
               <Popup>
-                <div className="text-xs w-72 text-slate-100 font-sans">
-                  {/* Header */}
-                  <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2.5">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                      <span className="font-bold text-white text-sm">{node.id}</span>
-                      <span className="text-slate-400 text-xs font-normal">({node.name.split(" ")[0]})</span>
-                    </div>
-                    <span className="text-[11px] text-slate-300 bg-slate-800/80 px-2 py-0.5 rounded-full border border-white/5">
-                      {node.sector}
+                <div className="text-xs w-64 text-slate-100 font-sans p-1">
+                  {/* Clean Simple Header: Node-01 (Dhikala Ridge) + Status */}
+                  <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2">
+                    <span className="font-bold text-white text-xs">
+                      {node.id} ({node.name.replace("Post", "").trim()})
+                    </span>
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                      isAlert 
+                        ? "bg-rose-500/20 text-rose-300 border border-rose-500/30" 
+                        : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                    }`}>
+                      {isAlert ? "⚠️ Threat Alert" : "🟢 Healthy"}
                     </span>
                   </div>
 
-                  {/* Threat Status Badge */}
-                  <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border text-xs font-medium mb-3 ${threatInfo.color}`}>
-                    {threatInfo.icon}
-                    <span>{threatInfo.label}</span>
-                    {isAlert && <span className="ml-auto font-bold">{node.threatConfidence}%</span>}
-                  </div>
-
-                  {/* 4 Clean Human-Readable Metric Cards */}
-                  <div className="space-y-1.5 bg-slate-900/80 p-2.5 rounded-xl border border-white/5 text-[11px] mb-3">
-                    {/* Card 1: Temp & Humidity */}
-                    <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/50 border border-white/5">
-                      <div className="flex items-center gap-2 text-slate-300">
-                        <Thermometer className="w-3.5 h-3.5 text-rose-400" />
-                        <span>Temp &amp; Humidity</span>
-                      </div>
-                      <span className="font-semibold text-white">
+                  {/* 3 Essential Human Metrics */}
+                  <div className="space-y-1.5 bg-slate-900/80 p-2 rounded-xl border border-white/5 text-[11px] mb-2.5">
+                    {/* Metric 1: Temp & Humidity */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">🌡️ Temp &amp; Hum:</span>
+                      <strong className="text-white font-medium">
                         {node.telemetry.temp.toFixed(1)}°C • {node.telemetry.humidity.toFixed(0)}%
-                      </span>
+                      </strong>
                     </div>
 
-                    {/* Card 2: Air Quality */}
-                    <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/50 border border-white/5">
-                      <div className="flex items-center gap-2 text-slate-300">
-                        <Wind className="w-3.5 h-3.5 text-amber-400" />
-                        <span>Air Quality (VOC)</span>
-                      </div>
-                      <span className={`font-semibold ${node.activeThreat === "FOREST_FIRE" ? "text-rose-400" : "text-emerald-400"}`}>
-                        {node.activeThreat === "FOREST_FIRE" ? "Smoke Detected" : `${node.telemetry.vocGas.toFixed(1)} kΩ`}
-                      </span>
+                    {/* Metric 2: Air Quality */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">💨 Air Quality:</span>
+                      <strong className={`font-medium ${isAlert && node.activeThreat === "FOREST_FIRE" ? "text-rose-400" : "text-emerald-400"}`}>
+                        {isAlert && node.activeThreat === "FOREST_FIRE" ? "Smoke Detected" : "Clean Air (Normal)"}
+                      </strong>
                     </div>
 
-                    {/* Card 3: Battery & Solar */}
-                    <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/50 border border-white/5">
-                      <div className="flex items-center gap-2 text-slate-300">
-                        <Battery className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>LiFePO4 Battery</span>
-                      </div>
-                      <span className="font-semibold text-emerald-400">
-                        {node.telemetry.battery}% ({node.solarInputWatts}W Solar)
-                      </span>
-                    </div>
-
-                    {/* Card 4: Signal */}
-                    <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/50 border border-white/5">
-                      <div className="flex items-center gap-2 text-slate-300">
-                        <Radio className="w-3.5 h-3.5 text-sky-400" />
-                        <span>LoRa Mesh (IN865)</span>
-                      </div>
-                      <span className="font-semibold text-sky-400">
-                        {node.telemetry.rssi} dBm
-                      </span>
+                    {/* Metric 3: Battery */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">🔋 Battery:</span>
+                      <strong className="text-emerald-400 font-medium">
+                        {node.telemetry.battery}% (Solar Active)
+                      </strong>
                     </div>
                   </div>
 
+                  {/* Action Button: View Full Telemetry */}
                   <button
                     onClick={() => {
                       soundFX.playBlip();
                       onOpenDrawer(node);
                     }}
-                    className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 font-semibold text-xs transition-colors"
+                    className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs transition-colors"
                   >
                     <ExternalLink className="w-3.5 h-3.5" />
-                    Inspect Station Telemetry
+                    View Full Telemetry
                   </button>
                 </div>
               </Popup>
@@ -366,23 +320,16 @@ export const MapInner: React.FC<MapInnerProps> = ({
             icon={createRangerIcon(ranger)}
           >
             <Popup>
-              <div className="text-xs text-slate-100 p-1 w-64 font-sans">
-                <div className="font-bold text-sky-300 flex items-center gap-1.5 mb-1 text-sm">
-                  <Navigation className="w-4 h-4 text-sky-400" />
+              <div className="text-xs text-slate-100 p-1 w-56 font-sans">
+                <div className="font-bold text-sky-300 flex items-center gap-1.5 mb-1 text-xs">
+                  <Navigation className="w-3.5 h-3.5 text-sky-400" />
                   {ranger.callsign}
                 </div>
-                <div className="text-[11px] text-slate-300 mb-2">{ranger.team}</div>
-                <div className="space-y-1 bg-slate-900/90 p-2.5 rounded-xl border border-white/5 text-[11px]">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Unit Status:</span>
-                    <span className={`font-semibold ${ranger.status === "EN_ROUTE" ? "text-amber-400 animate-pulse" : "text-emerald-400"}`}>
-                      {ranger.status}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-slate-400">
-                    <span>GPS Coordinates:</span>
-                    <span className="font-mono text-slate-200">{ranger.lat.toFixed(4)}°N, {ranger.lng.toFixed(4)}°E</span>
-                  </div>
+                <div className="flex items-center justify-between text-xs bg-slate-900 p-2 rounded-lg border border-white/5 mt-1">
+                  <span className="text-slate-400">Status:</span>
+                  <span className={`font-semibold ${ranger.status === "EN_ROUTE" ? "text-amber-400" : "text-emerald-400"}`}>
+                    {ranger.status}
+                  </span>
                 </div>
               </div>
             </Popup>
@@ -392,7 +339,7 @@ export const MapInner: React.FC<MapInnerProps> = ({
 
       {/* Floating Tactical Location Badge */}
       <div className="absolute top-4 right-4 z-20 flex items-center gap-2 text-xs">
-        <div className="px-3.5 py-1.5 rounded-full bg-slate-950/85 border border-white/15 text-slate-200 backdrop-blur-md flex items-center gap-2 shadow-xl font-medium">
+        <div className="px-3 py-1 rounded-full bg-slate-950/85 border border-white/15 text-slate-200 backdrop-blur-md flex items-center gap-1.5 shadow-xl text-[11px] font-medium">
           <MapPin className="w-3.5 h-3.5 text-emerald-400" />
           <span>Jim Corbett National Park (29.53° N, 78.77° E)</span>
         </div>
