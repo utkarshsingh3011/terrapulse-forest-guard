@@ -1,0 +1,386 @@
+"use client";
+
+import React, { useEffect, useMemo, useState } from "react";
+import { 
+  MapContainer, 
+  TileLayer, 
+  Marker, 
+  Popup, 
+  Circle, 
+  useMap, 
+  LayersControl, 
+  ScaleControl 
+} from "react-leaflet";
+import L from "leaflet";
+import { NodeData, RangerUnit, ThreatAlert, ThreatCategory } from "@/types/telemetry";
+import { 
+  Flame, 
+  Axe, 
+  Volume2, 
+  AlertTriangle, 
+  Radio, 
+  Battery, 
+  Wind, 
+  Thermometer, 
+  Droplets, 
+  ShieldCheck, 
+  Navigation,
+  ExternalLink,
+  MapPin,
+  Maximize2,
+  Compass,
+  Layers,
+  Eye,
+  EyeOff
+} from "lucide-react";
+import { soundFX } from "@/lib/audio";
+
+interface MapInnerProps {
+  nodes: NodeData[];
+  selectedNode: NodeData | null;
+  onSelectNode: (node: NodeData) => void;
+  onOpenDrawer: (node: NodeData) => void;
+  rangerUnits: RangerUnit[];
+  activeAlerts: ThreatAlert[];
+}
+
+// Subcomponent to animate/fly map view when a node is selected
+function MapController({ selectedNode }: { selectedNode: NodeData | null }) {
+  const map = useMap();
+  useEffect(() => {
+    if (selectedNode) {
+      map.flyTo([selectedNode.lat, selectedNode.lng], 14, {
+        animate: true,
+        duration: 1.2,
+      });
+    }
+  }, [selectedNode, map]);
+  return null;
+}
+
+// Subcomponent for custom map buttons (Recenter, Zoom, etc.)
+function MapCustomControls({ defaultCenter }: { defaultCenter: [number, number] }) {
+  const map = useMap();
+  return (
+    <div className="absolute bottom-6 right-4 z-[400] flex flex-col gap-2">
+      <button
+        onClick={() => {
+          soundFX.playBlip();
+          map.flyTo(defaultCenter, 13, { duration: 1 });
+        }}
+        className="p-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-white/10 text-slate-300 hover:text-white shadow-lg backdrop-blur-md transition-all flex items-center justify-center"
+        title="Recenter Map View"
+      >
+        <Compass className="w-4 h-4 text-emerald-400" />
+      </button>
+    </div>
+  );
+}
+
+export const MapInner: React.FC<MapInnerProps> = ({
+  nodes,
+  selectedNode,
+  onSelectNode,
+  onOpenDrawer,
+  rangerUnits,
+  activeAlerts,
+}) => {
+  // Center coordinates for Jim Corbett National Park
+  const defaultCenter: [number, number] = [29.5300, 78.7747];
+  const [showRadius, setShowRadius] = useState(true);
+
+  // Helper to create dynamic custom Leaflet icons
+  const createNodeIcon = (node: NodeData) => {
+    const isAlert = node.activeThreat !== "NONE";
+    const threatClass = isAlert 
+      ? "marker-pulse-red" 
+      : node.status === "DEGRADED" 
+        ? "marker-pulse-amber" 
+        : "marker-pulse-green";
+
+    const statusDot = isAlert ? "#f43f5e" : "#10b981";
+    const shortId = node.id.replace("Node-0", "ST-").replace("Node-", "ST-");
+
+    return L.divIcon({
+      className: "custom-node-marker",
+      html: `
+        <div class="${threatClass}">
+          <span style="font-size: 14px;">${isAlert ? "⚠️" : "📡"}</span>
+          <div style="
+            position: absolute; 
+            bottom: -22px; 
+            white-space: nowrap; 
+            background: rgba(15, 23, 42, 0.95); 
+            border: 1px solid rgba(255, 255, 255, 0.15); 
+            color: #f1f5f9; 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            font-size: 11px; 
+            font-weight: 600; 
+            padding: 2px 8px; 
+            border-radius: 9999px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+          ">
+            <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:${statusDot};"></span>
+            ${shortId}
+          </div>
+        </div>
+      `,
+      iconSize: [38, 38],
+      iconAnchor: [19, 19],
+      popupAnchor: [0, -22],
+    });
+  };
+
+  const rangerIcon = useMemo(() => {
+    return L.divIcon({
+      className: "custom-ranger-marker",
+      html: `
+        <div style="
+          width: 34px; 
+          height: 34px; 
+          background: rgba(14, 165, 233, 0.25); 
+          border: 2px solid #38bdf8; 
+          border-radius: 50%; 
+          display: flex; 
+          align-items: center; 
+          justify-content: center; 
+          box-shadow: 0 0 15px rgba(56, 189, 248, 0.5);
+        ">
+          <span style="font-size: 14px;">🚙</span>
+        </div>
+      `,
+      iconSize: [34, 34],
+      iconAnchor: [17, 17],
+      popupAnchor: [0, -20],
+    });
+  }, []);
+
+  const getThreatLabel = (threat: ThreatCategory) => {
+    switch (threat) {
+      case "FOREST_FIRE":
+        return { label: "Thermal & Smoke Anomaly", icon: <Flame className="w-3.5 h-3.5 text-rose-400" />, color: "text-rose-300 border-rose-500/30 bg-rose-500/15" };
+      case "CHAINSAW":
+        return { label: "Chainsaw Sound Match", icon: <Axe className="w-3.5 h-3.5 text-amber-400" />, color: "text-amber-300 border-amber-500/30 bg-amber-500/15" };
+      case "GUNSHOT":
+        return { label: "Gunshot Acoustic Shock", icon: <Volume2 className="w-3.5 h-3.5 text-rose-400" />, color: "text-rose-300 border-rose-500/30 bg-rose-500/15" };
+      case "TAMPER":
+        return { label: "Station Physical Tilt", icon: <AlertTriangle className="w-3.5 h-3.5 text-sky-400" />, color: "text-sky-300 border-sky-500/30 bg-sky-500/15" };
+      default:
+        return { label: "Station Healthy • Normal", icon: <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />, color: "text-emerald-300 border-emerald-500/25 bg-emerald-500/15" };
+    }
+  };
+
+  return (
+    <div className="relative w-full h-full">
+      <MapContainer
+        center={defaultCenter}
+        zoom={13}
+        className="w-full h-full z-10"
+        zoomControl={false}
+      >
+        <MapController selectedNode={selectedNode} />
+        <MapCustomControls defaultCenter={defaultCenter} />
+        <ScaleControl position="bottomleft" />
+
+        <LayersControl position="topleft">
+          <LayersControl.BaseLayer checked name="🛰️ Satellite (Esri)">
+            <TileLayer
+              attribution="Tiles &copy; Esri"
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+              maxZoom={19}
+            />
+          </LayersControl.BaseLayer>
+
+          <LayersControl.BaseLayer name="🌑 Clean Dark (CartoDB)">
+            <TileLayer
+              attribution='&copy; <a href="https://carto.com/">CartoDB</a>'
+              url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+              maxZoom={19}
+            />
+          </LayersControl.BaseLayer>
+
+          <LayersControl.BaseLayer name="🗺️ Topographic (OpenTopo)">
+            <TileLayer
+              attribution='&copy; OpenStreetMap & SRTM'
+              url="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
+              maxZoom={17}
+            />
+          </LayersControl.BaseLayer>
+        </LayersControl>
+
+        {/* Threat Radius Circles */}
+        {showRadius && nodes.map((node) => {
+          if (node.activeThreat !== "NONE" && node.threatRadius > 0) {
+            const isFire = node.activeThreat === "FOREST_FIRE";
+            const circleColor = isFire ? "#f43f5e" : node.activeThreat === "GUNSHOT" ? "#fb7185" : "#f59e0b";
+
+            return (
+              <Circle
+                key={`threat-circle-${node.id}`}
+                center={[node.lat, node.lng]}
+                radius={node.threatRadius}
+                pathOptions={{
+                  color: circleColor,
+                  fillColor: circleColor,
+                  fillOpacity: 0.2,
+                  weight: 1.5,
+                  dashArray: "5, 5",
+                  className: "leaflet-threat-circle",
+                }}
+              >
+                <Popup>
+                  <div className="text-xs text-slate-100 p-1">
+                    <div className="font-semibold text-rose-400 flex items-center gap-1.5 mb-1">
+                      <Flame className="w-4 h-4" />
+                      Estimated Radius: {node.threatRadius}m
+                    </div>
+                    <p className="text-[11px] text-slate-300">
+                      Sensor detection reach around {node.name}.
+                    </p>
+                  </div>
+                </Popup>
+              </Circle>
+            );
+          }
+          return null;
+        })}
+
+        {/* Station Markers */}
+        {nodes.map((node) => {
+          const threatInfo = getThreatLabel(node.activeThreat);
+          const isAlert = node.activeThreat !== "NONE";
+
+          return (
+            <Marker
+              key={node.id}
+              position={[node.lat, node.lng]}
+              icon={createNodeIcon(node)}
+              eventHandlers={{
+                click: () => {
+                  soundFX.playBlip();
+                  onSelectNode(node);
+                },
+              }}
+            >
+              <Popup>
+                <div className="text-xs w-72 text-slate-100 font-sans">
+                  {/* Header */}
+                  <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2.5">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                      <span className="font-bold text-white text-sm">{node.id}</span>
+                      <span className="text-slate-400 text-xs font-normal">({node.name.split(" ")[0]})</span>
+                    </div>
+                    <span className="text-[11px] text-slate-300 bg-slate-800/80 px-2 py-0.5 rounded-full border border-white/5">
+                      {node.sector}
+                    </span>
+                  </div>
+
+                  {/* Threat Status Badge */}
+                  <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl border text-xs font-medium mb-3 ${threatInfo.color}`}>
+                    {threatInfo.icon}
+                    <span>{threatInfo.label}</span>
+                    {isAlert && <span className="ml-auto font-bold">{node.threatConfidence}%</span>}
+                  </div>
+
+                  {/* 4 Clean Human-Readable Metric Cards */}
+                  <div className="space-y-1.5 bg-slate-900/80 p-2.5 rounded-xl border border-white/5 text-[11px] mb-3">
+                    {/* Card 1: Temp & Humidity */}
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/50 border border-white/5">
+                      <div className="flex items-center gap-2 text-slate-300">
+                        <Thermometer className="w-3.5 h-3.5 text-rose-400" />
+                        <span>Temp &amp; Humidity</span>
+                      </div>
+                      <span className="font-semibold text-white">
+                        {node.telemetry.temp.toFixed(1)}°C • {node.telemetry.humidity.toFixed(0)}%
+                      </span>
+                    </div>
+
+                    {/* Card 2: Air Quality */}
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/50 border border-white/5">
+                      <div className="flex items-center gap-2 text-slate-300">
+                        <Wind className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Air Quality</span>
+                      </div>
+                      <span className={`font-semibold ${node.activeThreat === "FOREST_FIRE" ? "text-rose-400" : "text-emerald-400"}`}>
+                        {node.activeThreat === "FOREST_FIRE" ? "Smoke Detected" : "Clean Air"}
+                      </span>
+                    </div>
+
+                    {/* Card 3: Battery */}
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/50 border border-white/5">
+                      <div className="flex items-center gap-2 text-slate-300">
+                        <Battery className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Battery &amp; Backup</span>
+                      </div>
+                      <span className="font-semibold text-emerald-400">
+                        {node.telemetry.battery}% • ~{Math.max(1, Math.round((node.telemetry.battery / 100) * 14))}d
+                      </span>
+                    </div>
+
+                    {/* Card 4: Signal */}
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/50 border border-white/5">
+                      <div className="flex items-center gap-2 text-slate-300">
+                        <Radio className="w-3.5 h-3.5 text-sky-400" />
+                        <span>Mesh Signal</span>
+                      </div>
+                      <span className="font-semibold text-sky-400">
+                        Strong (LoRa IN865)
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      soundFX.playBlip();
+                      onOpenDrawer(node);
+                    }}
+                    className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 font-semibold text-xs transition-colors"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    Inspect Station Telemetry
+                  </button>
+                </div>
+              </Popup>
+            </Marker>
+          );
+        })}
+
+        {/* Ranger Units */}
+        {rangerUnits.map((ranger) => (
+          <Marker
+            key={ranger.id}
+            position={[ranger.lat, ranger.lng]}
+            icon={rangerIcon}
+          >
+            <Popup>
+              <div className="text-xs text-slate-100 p-1 w-60 font-sans">
+                <div className="font-bold text-sky-400 flex items-center gap-1.5 mb-1 text-sm">
+                  <Navigation className="w-4 h-4" />
+                  {ranger.callsign}
+                </div>
+                <div className="text-[11px] text-slate-300 mb-2">{ranger.team}</div>
+                <div className="flex items-center justify-between text-xs bg-slate-900 p-2 rounded-lg border border-white/5">
+                  <span className="text-slate-400">Patrol Status:</span>
+                  <span className="font-semibold text-emerald-400">{ranger.status}</span>
+                </div>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+      </MapContainer>
+
+      {/* Clean Floating Map Info Badge */}
+      <div className="absolute top-4 right-4 z-20 flex items-center gap-2 text-xs">
+        <div className="px-3 py-1.5 rounded-full bg-slate-950/80 border border-white/10 text-slate-300 backdrop-blur-md flex items-center gap-2 shadow-lg">
+          <MapPin className="w-3.5 h-3.5 text-emerald-400" />
+          <span>Jim Corbett Reserve (29.53° N, 78.77° E)</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+

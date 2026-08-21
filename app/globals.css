@@ -1,0 +1,175 @@
+@import 'leaflet/dist/leaflet.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #080e14;
+  --foreground: #f1f5f9;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: "Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  overflow-x: hidden;
+  user-select: none;
+}
+
+/* Modern Clean Scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(16, 185, 129, 0.4);
+}
+
+/* Glassmorphism Panel Utilities */
+.glass-panel {
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.glass-panel-subtle {
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.glass-card {
+  background: rgba(30, 41, 59, 0.45);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  transition: all 0.2s ease-in-out;
+}
+
+.glass-card:hover {
+  background: rgba(30, 41, 59, 0.65);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+/* Soft ambient background */
+.forest-ambient-bg {
+  background-color: #080e14;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.05) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(14, 165, 233, 0.04) 0px, transparent 50%);
+}
+
+/* Leaflet Map Custom Marker Styles */
+.custom-node-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.marker-pulse-green {
+  width: 32px;
+  height: 32px;
+  background: rgba(16, 185, 129, 0.2);
+  border: 2px solid #10b981;
+  border-radius: 50%;
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease;
+}
+
+.marker-pulse-red {
+  width: 38px;
+  height: 38px;
+  background: rgba(244, 63, 94, 0.25);
+  border: 2px solid #f43f5e;
+  border-radius: 50%;
+  box-shadow: 0 0 20px rgba(244, 63, 94, 0.6);
+  animation: pulseSoftRed 1.8s infinite;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.marker-pulse-amber {
+  width: 34px;
+  height: 34px;
+  background: rgba(245, 158, 11, 0.25);
+  border: 2px solid #f59e0b;
+  border-radius: 50%;
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.5);
+  animation: pulseSoftAmber 2s infinite;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@keyframes pulseSoftGreen {
+  0% { transform: scale(0.96); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+  70% { transform: scale(1.08); box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+  100% { transform: scale(0.96); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+@keyframes pulseSoftRed {
+  0% { transform: scale(0.92); box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.7); }
+  50% { transform: scale(1.15); box-shadow: 0 0 0 14px rgba(244, 63, 94, 0); }
+  100% { transform: scale(0.92); box-shadow: 0 0 0 0 rgba(244, 63, 94, 0); }
+}
+
+@keyframes pulseSoftAmber {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.6); }
+  70% { transform: scale(1.1); box-shadow: 0 0 0 12px rgba(245, 158, 11, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+
+/* Threat Radar Ripple Animation for Leaflet Circles */
+.leaflet-threat-circle {
+  animation: threatPulseSoft 2.5s ease-in-out infinite alternate;
+}
+
+@keyframes threatPulseSoft {
+  0% { stroke-opacity: 0.8; fill-opacity: 0.15; stroke-width: 1.5px; }
+  100% { stroke-opacity: 0.35; fill-opacity: 0.3; stroke-width: 3px; }
+}
+
+/* Leaflet Popup Humanistic Overrides */
+.leaflet-popup-content-wrapper {
+  background: rgba(15, 23, 42, 0.95) !important;
+  color: #f1f5f9 !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.6) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  padding: 0 !important;
+}
+
+.leaflet-popup-tip {
+  background: #0f172a !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+}
+
+.leaflet-popup-content {
+  margin: 14px 16px !important;
+  line-height: 1.4 !important;
+}
+
+.leaflet-container {
+  background: #080e14 !important;
+  font-family: inherit !important;
+}
+
