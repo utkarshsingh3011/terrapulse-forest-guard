@@ -334,7 +334,7 @@ def main():
   parser.add_argument("--port", type=str, default=default_detected_port)
   parser.add_argument("--baud", type=int, default=115200)
   parser.add_argument(
-      "--url", type=str, default="http://localhost:3001/api/telemetry"
+      "--url", type=str, default="http://localhost:3000/api/telemetry"
   )
   parser.add_argument("--node-id", type=str, default="ST-01")
   parser.add_argument("--lat", type=float, default=29.5300)
