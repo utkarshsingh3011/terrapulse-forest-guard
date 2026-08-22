@@ -71,6 +71,17 @@ export async function POST(req: NextRequest) {
           alerts[alertIndex].dispatchedUnit = body.dispatchedUnit;
           alerts[alertIndex].dispatchedAt = "Just now";
         }
+        
+        // If the alert is marked as False Alarm (ACKNOWLEDGED) or RESOLVED, reset the node's active threat back to normal
+        if (body.status === "ACKNOWLEDGED" || body.status === "RESOLVED") {
+          const nodeIndex = nodes.findIndex(n => n.id === alerts[alertIndex].nodeId);
+          if (nodeIndex >= 0) {
+            nodes[nodeIndex].activeThreat = "NONE";
+            nodes[nodeIndex].threatConfidence = 0;
+            nodes[nodeIndex].threatRadius = 0;
+          }
+        }
+
         const threatLevel = calculateThreatLevel(nodes, alerts);
         return NextResponse.json({
           success: true,
