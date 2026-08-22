@@ -50,7 +50,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    let body: (TelemetryPayload & { alertId?: string; status?: IncidentStatus; dispatchedUnit?: string });
+    let body: (TelemetryPayload & { alertId?: string; status?: IncidentStatus; dispatchedUnit?: string; smoke?: number | string });
     try {
       body = await req.json();
     } catch {
@@ -71,6 +71,17 @@ export async function POST(req: NextRequest) {
           alerts[alertIndex].dispatchedUnit = body.dispatchedUnit;
           alerts[alertIndex].dispatchedAt = "Just now";
         }
+        
+        // If the alert is marked as False Alarm (ACKNOWLEDGED) or RESOLVED, reset the node's active threat back to normal
+        if (body.status === "ACKNOWLEDGED" || body.status === "RESOLVED") {
+          const nodeIndex = nodes.findIndex(n => n.id === alerts[alertIndex].nodeId);
+          if (nodeIndex >= 0) {
+            nodes[nodeIndex].activeThreat = "NONE";
+            nodes[nodeIndex].threatConfidence = 0;
+            nodes[nodeIndex].threatRadius = 0;
+          }
+        }
+
         const threatLevel = calculateThreatLevel(nodes, alerts);
         return NextResponse.json({
           success: true,
@@ -113,7 +124,7 @@ export async function POST(req: NextRequest) {
       const existing = nodes[nodeIndex];
       const newTemp = body.temp !== undefined ? Number(body.temp) : existing.telemetry.temp;
       const newHum = body.hum !== undefined ? Number(body.hum) : existing.telemetry.humidity;
-      const newVoc = body.voc !== undefined ? Number(body.voc) : existing.telemetry.vocGas;
+      const newVoc = body.voc !== undefined ? Number(body.voc) : (body.smoke !== undefined ? Number(body.smoke) : existing.telemetry.vocGas);
       const newPressure = body.pressure !== undefined ? Number(body.pressure) : existing.telemetry.pressure;
       const newBattery = body.battery !== undefined ? Number(body.battery) : existing.telemetry.battery;
       const newRssi = body.rssi !== undefined ? Number(body.rssi) : existing.telemetry.rssi;
@@ -171,7 +182,7 @@ export async function POST(req: NextRequest) {
         telemetry: {
           temp: body.temp !== undefined ? Number(body.temp) : 29.0,
           humidity: body.hum !== undefined ? Number(body.hum) : 60.0,
-          vocGas: body.voc !== undefined ? Number(body.voc) : 120.0,
+          vocGas: body.voc !== undefined ? Number(body.voc) : (body.smoke !== undefined ? Number(body.smoke) : 120.0),
           pressure: body.pressure !== undefined ? Number(body.pressure) : 1012.0,
           battery: body.battery !== undefined ? Number(body.battery) : 95,
           rssi: body.rssi !== undefined ? Number(body.rssi) : -75,

@@ -27,8 +27,8 @@ export default function RangerCommandDashboard() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
 
-  const prevAlertCount = useRef<number>(INITIAL_ALERTS.length);
-  const prevAlertId = useRef<string | null>(null);
+  const seenAlertIds = useRef<Set<string>>(new Set(INITIAL_ALERTS.map(a => a.id)));
+  const lastAlertSnapshots = useRef<Record<string, string>>({});
 
   // Sync state from GET /api/telemetry
   const fetchTelemetry = useCallback(async () => {
@@ -50,14 +50,41 @@ export default function RangerCommandDashboard() {
         }
         if (data.alerts) {
           setAlerts(data.alerts);
-          // Check for active incoming threat alerts
-          const latestActive = data.alerts.find((a: ThreatAlert) => a.status === "ACTIVE" && a.threat !== "NONE");
-          if (latestActive && (data.alerts.length > prevAlertCount.current || latestActive.id !== prevAlertId.current)) {
-            soundFX.playThreatAlarm();
-            setActiveIncidentModal(latestActive);
-            prevAlertId.current = latestActive.id;
+          // Find ALL active threats (GUNSHOT, CHAINSAW, FIRE, TAMPER — all treated equally)
+          const activeAlerts = data.alerts.filter((a: ThreatAlert) => a.status === "ACTIVE" && a.threat !== "NONE");
+          
+          let triggerModal = false;
+          let highestPriorityAlert: ThreatAlert | null = null;
+          
+          for (const active of activeAlerts) {
+            // Build a fingerprint: id + confidence rounded to detect fresh updates
+            const fingerprint = `${active.id}-${Math.round(active.confidence)}`;
+            const prevSnapshot = lastAlertSnapshots.current[active.id];
+            
+            if (!seenAlertIds.current.has(active.id) || fingerprint !== prevSnapshot) {
+              // This is either a brand new alert OR an updated one with new confidence
+              seenAlertIds.current.add(active.id);
+              lastAlertSnapshots.current[active.id] = fingerprint;
+              triggerModal = true;
+              
+              if (!highestPriorityAlert || active.confidence > highestPriorityAlert.confidence) {
+                highestPriorityAlert = active;
+              }
+            }
           }
-          prevAlertCount.current = data.alerts.length;
+
+          if (triggerModal && highestPriorityAlert) {
+            setActiveIncidentModal((prev) => {
+              if (!prev || prev.id === highestPriorityAlert!.id) {
+                // If no modal open, OR it's the exact same modal just getting updated, pop it / update it.
+                if (!prev) soundFX.playThreatAlarm();
+                return highestPriorityAlert;
+              }
+              // CRITICAL: If a completely different modal is already open, DO NOT forcefully interrupt the user!
+              // They can see the second threat in the sidebar "Incident Feed".
+              return prev; 
+            });
+          }
         }
         if (data.metrics?.threatLevel) {
           setThreatLevel(data.metrics.threatLevel);
