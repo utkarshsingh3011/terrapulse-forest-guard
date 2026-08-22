@@ -27,8 +27,8 @@ export default function RangerCommandDashboard() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
 
-  const prevAlertCount = useRef<number>(INITIAL_ALERTS.length);
-  const prevAlertId = useRef<string | null>(null);
+  const seenAlertIds = useRef<Set<string>>(new Set(INITIAL_ALERTS.map(a => a.id)));
+  const lastAlertSnapshot = useRef<string>("");
 
   // Sync state from GET /api/telemetry
   const fetchTelemetry = useCallback(async () => {
@@ -50,14 +50,22 @@ export default function RangerCommandDashboard() {
         }
         if (data.alerts) {
           setAlerts(data.alerts);
-          // Check for active incoming threat alerts
-          const latestActive = data.alerts.find((a: ThreatAlert) => a.status === "ACTIVE" && a.threat !== "NONE");
-          if (latestActive && (data.alerts.length > prevAlertCount.current || latestActive.id !== prevAlertId.current)) {
-            soundFX.playThreatAlarm();
-            setActiveIncidentModal(latestActive);
-            prevAlertId.current = latestActive.id;
+          // Find ALL active threats (GUNSHOT, CHAINSAW, FIRE, TAMPER — all treated equally)
+          const activeAlerts = data.alerts.filter((a: ThreatAlert) => a.status === "ACTIVE" && a.threat !== "NONE");
+          
+          for (const active of activeAlerts) {
+            // Build a fingerprint: id + confidence rounded to detect fresh updates
+            const fingerprint = `${active.id}-${Math.round(active.confidence)}`;
+            
+            if (!seenAlertIds.current.has(active.id) || fingerprint !== lastAlertSnapshot.current) {
+              // This is either a brand new alert OR an updated one with new confidence
+              soundFX.playThreatAlarm();
+              setActiveIncidentModal(active);
+              seenAlertIds.current.add(active.id);
+              lastAlertSnapshot.current = fingerprint;
+              break; // Show the most urgent one first
+            }
           }
-          prevAlertCount.current = data.alerts.length;
         }
         if (data.metrics?.threatLevel) {
           setThreatLevel(data.metrics.threatLevel);
