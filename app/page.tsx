@@ -316,8 +316,13 @@ export default function RangerCommandDashboard() {
           <SatelliteMap
             nodes={nodes}
             selectedNode={selectedNode}
+            inspectNode={inspectNode}
+            isSidebarOpen={isSidebarOpen}
             onSelectNode={(node) => setSelectedNode(node)}
-            onOpenDrawer={(node) => setInspectNode(node)}
+            onOpenDrawer={(node) => {
+              setSelectedNode(null);
+              setInspectNode(node);
+            }}
             rangerUnits={rangerUnits}
             activeAlerts={alerts}
           />

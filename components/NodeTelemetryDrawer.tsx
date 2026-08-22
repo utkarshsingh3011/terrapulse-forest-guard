@@ -30,7 +30,7 @@ export const NodeTelemetryDrawer: React.FC<NodeTelemetryDrawerProps> = ({
   const recommendedAction = getRecommendedAction(node.activeThreat);
 
   return (
-    <div className="fixed inset-y-0 right-0 z-40 w-full sm:w-[420px] bg-slate-950/95 border-l border-white/10 shadow-2xl backdrop-blur-2xl flex flex-col font-sans text-xs animate-in slide-in-from-right duration-300">
+    <div className="fixed inset-y-0 right-0 z-50 w-full sm:w-[420px] bg-slate-950/98 border-l border-white/10 shadow-2xl backdrop-blur-2xl flex flex-col font-sans text-xs animate-in slide-in-from-right duration-300">
       {/* Drawer Header */}
       <div className="p-4 bg-slate-900/70 border-b border-white/10 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">

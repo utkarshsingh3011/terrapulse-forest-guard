@@ -8,6 +8,8 @@ import { Loader2, Radio } from "lucide-react";
 interface SatelliteMapProps {
   nodes: NodeData[];
   selectedNode: NodeData | null;
+  inspectNode?: NodeData | null;
+  isSidebarOpen?: boolean;
   onSelectNode: (node: NodeData) => void;
   onOpenDrawer: (node: NodeData) => void;
   rangerUnits: RangerUnit[];

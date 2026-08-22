@@ -36,15 +36,24 @@ import { soundFX } from "@/lib/audio";
 interface MapInnerProps {
   nodes: NodeData[];
   selectedNode: NodeData | null;
+  inspectNode?: NodeData | null;
+  isSidebarOpen?: boolean;
   onSelectNode: (node: NodeData) => void;
   onOpenDrawer: (node: NodeData) => void;
   rangerUnits: RangerUnit[];
   activeAlerts: ThreatAlert[];
 }
 
-// Subcomponent to fly map view when a node is selected
-function MapController({ selectedNode }: { selectedNode: NodeData | null }) {
+// Subcomponent to fly map view when a node is selected and auto-close popups when inspecting drawer
+function MapController({ 
+  selectedNode, 
+  inspectNode 
+}: { 
+  selectedNode: NodeData | null;
+  inspectNode?: NodeData | null;
+}) {
   const map = useMap();
+
   useEffect(() => {
     if (selectedNode) {
       map.flyTo([selectedNode.lat, selectedNode.lng], 14, {
@@ -53,6 +62,62 @@ function MapController({ selectedNode }: { selectedNode: NodeData | null }) {
       });
     }
   }, [selectedNode, map]);
+
+  useEffect(() => {
+    if (inspectNode) {
+      map.closePopup();
+    }
+  }, [inspectNode, map]);
+
+  return null;
+}
+
+// Subcomponent to guarantee responsive Leaflet container resize when panels toggle
+function MapResizeHandler({
+  isDrawerOpen,
+  isSidebarOpen,
+}: {
+  isDrawerOpen?: boolean;
+  isSidebarOpen?: boolean;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    // Invalidate size immediately on mount
+    map.invalidateSize();
+
+    const container = map.getContainer();
+    if (!container) return;
+
+    // ResizeObserver watches container bounds smoothly
+    const resizeObserver = new ResizeObserver(() => {
+      map.invalidateSize();
+    });
+    resizeObserver.observe(container);
+
+    const handleResize = () => {
+      map.invalidateSize();
+    };
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [map]);
+
+  // Trigger invalidation on layout transitions
+  useEffect(() => {
+    const timer1 = setTimeout(() => map.invalidateSize(), 50);
+    const timer2 = setTimeout(() => map.invalidateSize(), 300);
+    const timer3 = setTimeout(() => map.invalidateSize(), 550);
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      clearTimeout(timer3);
+    };
+  }, [isDrawerOpen, isSidebarOpen, map]);
+
   return null;
 }
 
@@ -78,6 +143,8 @@ function MapCustomControls({ defaultCenter }: { defaultCenter: [number, number] 
 export const MapInner: React.FC<MapInnerProps> = ({
   nodes,
   selectedNode,
+  inspectNode,
+  isSidebarOpen,
   onSelectNode,
   onOpenDrawer,
   rangerUnits,
@@ -253,7 +320,8 @@ export const MapInner: React.FC<MapInnerProps> = ({
         className="w-full h-full z-10"
         zoomControl={false}
       >
-        <MapController selectedNode={selectedNode} />
+        <MapController selectedNode={selectedNode} inspectNode={inspectNode} />
+        <MapResizeHandler isDrawerOpen={Boolean(inspectNode)} isSidebarOpen={isSidebarOpen} />
         <MapCustomControls defaultCenter={defaultCenter} />
         <ScaleControl position="bottomleft" />
 
@@ -413,11 +481,12 @@ export const MapInner: React.FC<MapInnerProps> = ({
 
                   {/* Action Button: View Full Telemetry */}
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       soundFX.playBlip();
                       onOpenDrawer(node);
                     }}
-                    className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs transition-colors"
+                    className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-xs transition-colors cursor-pointer"
                   >
                     <ExternalLink className="w-3.5 h-3.5" />
                     View Full Telemetry
